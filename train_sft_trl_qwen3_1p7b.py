@@ -65,13 +65,13 @@ def main():
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
-    # T4 (15GB) OOMs with fp32; load in fp16/bf16 to fit
+    # Load in fp32; trainer handles fp16/bf16. (fp16 load causes "unscale FP16 gradients" error.)
     use_bf16 = torch.cuda.is_available() and torch.cuda.get_device_capability(0)[0] >= 8
     dtype = torch.bfloat16 if use_bf16 else torch.float16
 
     model = AutoModelForCausalLM.from_pretrained(
         args.model,
-        torch_dtype=dtype,
+        torch_dtype=torch.float32,
         low_cpu_mem_usage=True,
     )
 
