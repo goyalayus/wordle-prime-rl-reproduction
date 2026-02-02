@@ -1,4 +1,8 @@
 import argparse
+from pathlib import Path
+
+from dotenv import load_dotenv
+load_dotenv(Path(__file__).resolve().parent / ".env")
 
 import torch
 from datasets import Dataset, load_dataset
@@ -61,13 +65,13 @@ def main():
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
-    dtype = torch.float16
-    if torch.cuda.is_available() and torch.cuda.get_device_capability(0)[0] >= 8:
-        dtype = torch.bfloat16
+    # Let trainer handle dtype; pre-loading in fp16 conflicts with Accelerate's gradient scaling
+    use_bf16 = torch.cuda.is_available() and torch.cuda.get_device_capability(0)[0] >= 8
+    dtype = torch.bfloat16 if use_bf16 else torch.float16
 
     model = AutoModelForCausalLM.from_pretrained(
         args.model,
-        torch_dtype=dtype,
+        torch_dtype=torch.float32,  # Load in fp32, trainer casts to fp16/bf16
         low_cpu_mem_usage=True,
     )
 
