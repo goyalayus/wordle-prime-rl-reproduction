@@ -83,6 +83,14 @@ python train_sft_trl_qwen3_1p7b.py \
 
 Training curves will appear at [wandb.ai](https://wandb.ai) under the project you specify.
 
+## W&B API key
+
+- **Local**: The script loads `WANDB_API_KEY` from `.env` (gitignored). Create `.env` with:
+  ```
+  WANDB_API_KEY=your_key_from_wandb.ai/authorize
+  ```
+- **Lightning**: Run `wandb login` once after SSH, or copy your `.env` to the Studio (it is not in git).
+
 ## Notes
 
 - This is **full-parameter** fine-tuning (no LoRA, no quantization).

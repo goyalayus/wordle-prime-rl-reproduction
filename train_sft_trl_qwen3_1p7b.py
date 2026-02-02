@@ -65,13 +65,13 @@ def main():
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
-    # Let trainer handle dtype; pre-loading in fp16 conflicts with Accelerate's gradient scaling
+    # T4 (15GB) OOMs with fp32; load in fp16/bf16 to fit
     use_bf16 = torch.cuda.is_available() and torch.cuda.get_device_capability(0)[0] >= 8
     dtype = torch.bfloat16 if use_bf16 else torch.float16
 
     model = AutoModelForCausalLM.from_pretrained(
         args.model,
-        torch_dtype=torch.float32,  # Load in fp32, trainer casts to fp16/bf16
+        torch_dtype=dtype,
         low_cpu_mem_usage=True,
     )
 
@@ -102,6 +102,7 @@ def main():
         save_steps=args.save_steps,
         lr_scheduler_type="linear",
         weight_decay=0.0,
+        optim="adamw_8bit",  # 8-bit optimizer saves ~50% memory on T4
         fp16=dtype == torch.float16,
         bf16=dtype == torch.bfloat16,
         report_to=report_to,
