@@ -113,7 +113,6 @@ def main():
         args=training_args,
         train_dataset=dataset,
         processing_class=tokenizer,
-        packing=False,
     )
 
     trainer.train()
