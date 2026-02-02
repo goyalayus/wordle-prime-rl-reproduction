@@ -75,21 +75,14 @@ def main():
         model.gradient_checkpointing_enable()
         model.config.use_cache = False
 
-    dataset = load_dataset(args.dataset, split=args.split)
-
-    def flat_map_fn(batch):
-        all_prompts, all_completions = [], []
-        for i in range(len(batch["prompt"])):
-            rows = explode_to_prompt_completion(
-                {"prompt": batch["prompt"][i], "completion": batch["completion"][i]},
-                system_prompt=args.system_prompt,
-            )
-            for r in rows:
-                all_prompts.append(r["prompt"])
-                all_completions.append(r["completion"])
-        return Dataset.from_dict({"prompt": all_prompts, "completion": all_completions})
-
-    dataset = dataset.flat_map(flat_map_fn)
+    raw = load_dataset(args.dataset, split=args.split)
+    all_prompts, all_completions = [], []
+    for ex in raw:
+        rows = explode_to_prompt_completion(ex, system_prompt=args.system_prompt)
+        for r in rows:
+            all_prompts.append(r["prompt"])
+            all_completions.append(r["completion"])
+    dataset = Dataset.from_dict({"prompt": all_prompts, "completion": all_completions})
 
     report_to = "wandb" if args.wandb_project else "none"
     training_kwargs = dict(
