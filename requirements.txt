@@ -4,5 +4,6 @@ trl>=0.22.2
 datasets>=2.18.0
 accelerate
 bitsandbytes
+peft
 wandb
 python-dotenv>=1.0.0

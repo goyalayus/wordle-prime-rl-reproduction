@@ -6,6 +6,7 @@ load_dotenv(Path(__file__).resolve().parent / ".env")
 
 import torch
 from datasets import Dataset, load_dataset
+from peft import LoraConfig, get_peft_model, TaskType
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from trl import SFTConfig, SFTTrainer
 
@@ -53,6 +54,9 @@ def parse_args():
     parser.add_argument("--save-steps", type=int, default=20)
     parser.add_argument("--system-prompt", default=None)
     parser.add_argument("--gradient-checkpointing", action="store_true")
+    parser.add_argument("--lora", action="store_true", help="Use LoRA (required for T4 15GB)")
+    parser.add_argument("--lora-r", type=int, default=16)
+    parser.add_argument("--lora-alpha", type=int, default=32)
     parser.add_argument("--wandb-project", default=None, help="W&B project name. If set, enables wandb logging.")
     parser.add_argument("--wandb-name", default=None, help="W&B run name.")
     return parser.parse_args()
@@ -78,6 +82,18 @@ def main():
     if args.gradient_checkpointing:
         model.gradient_checkpointing_enable()
         model.config.use_cache = False
+
+    if args.lora:
+        lora_config = LoraConfig(
+            r=args.lora_r,
+            lora_alpha=args.lora_alpha,
+            target_modules=["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
+            lora_dropout=0.05,
+            bias="none",
+            task_type=TaskType.CAUSAL_LM,
+        )
+        model = get_peft_model(model, lora_config)
+        model.print_trainable_parameters()
 
     raw = load_dataset(args.dataset, split=args.split)
     all_prompts, all_completions = [], []
