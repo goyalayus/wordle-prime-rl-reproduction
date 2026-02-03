@@ -23,6 +23,8 @@ def main():
         if not os.path.exists(local_path):
             print(f"SKIP {repo_id}: {local_path} not found")
             continue
+        print(f"Creating repo {repo_id} (if needed)...")
+        api.create_repo(repo_id=repo_id, repo_type="model", exist_ok=True)
         print(f"Uploading {local_path} -> {repo_id}...")
         api.upload_folder(
             folder_path=local_path,
