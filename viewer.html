@@ -235,10 +235,10 @@
         </div>
 
         <div class="auto-load-list">
-            <button class="auto-load-btn" onclick="autoLoad('wordle_test_results.json', 0)">Load wordle_test_results.json</button>
-            <button class="auto-load-btn" onclick="autoLoad('results_primeintellect_1p7b.json', 0)">Load PrimeIntellect 1.7B</button>
-            <button class="auto-load-btn" onclick="autoLoad('results_qwen_1p7b.json', 1)">Load Qwen 1.7B</button>
-            <button class="auto-load-btn" onclick="autoLoad('results_qwen_0p6b.json', 2)">Load Qwen 0.6B</button>
+            <button class="auto-load-btn" onclick="loadAllThree()">Load all 3 models</button>
+            <button class="auto-load-btn" onclick="autoLoad('results_primeintellect_1p7b.json', 0)">PrimeIntellect 1.7B</button>
+            <button class="auto-load-btn" onclick="autoLoad('results_qwen_1p7b.json', 1)">Qwen 1.7B</button>
+            <button class="auto-load-btn" onclick="autoLoad('results_qwen_0p6b.json', 2)">Qwen 0.6B</button>
         </div>
 
         <div id="content">
@@ -270,6 +270,26 @@
                     renderComparison();
                 })
                 .catch(err => alert(`Could not load ${filename}: ${err.message}`));
+        }
+
+        function loadAllThree() {
+            const files = [
+                ['results_primeintellect_1p7b.json', 0],
+                ['results_qwen_1p7b.json', 1],
+                ['results_qwen_0p6b.json', 2]
+            ];
+            let loaded = 0;
+            files.forEach(([fn, slot]) => {
+                fetch(fn)
+                    .then(r => r.json())
+                    .then(data => {
+                        models[slot] = data;
+                        updateSlotUI(slot, data);
+                        loaded++;
+                        if (loaded === 3) renderComparison();
+                    })
+                    .catch(err => { alert(`Could not load ${fn}: ${err.message}`); });
+            });
         }
 
         function loadModel(file, slot) {
