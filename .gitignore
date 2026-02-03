@@ -1,4 +1,5 @@
 outputs/
+training_log_poll.txt
 __pycache__/
 *.pyc
 .venv/

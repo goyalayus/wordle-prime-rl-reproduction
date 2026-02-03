@@ -1,29 +1,55 @@
 """
-Full fine-tuning of Qwen3-1.7B on Wordle SFT data.
+Full fine-tuning of Qwen3 on Wordle SFT data. Model-agnostic.
 Works on a single A100 (40GB or 80GB).
 
 Usage:
-    python train_sft_full.py
+    python train_sft_full.py --model PrimeIntellect/Qwen3-1.7B
+    python train_sft_full.py --model Qwen/Qwen3-1.7B
+    python train_sft_full.py --model Qwen/Qwen3-0.6B
 """
 
-import os
+import argparse
 import torch
 from datasets import load_dataset
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from trl import SFTTrainer, SFTConfig
 
-# ============ Config ============
-MODEL_NAME = "PrimeIntellect/Qwen3-1.7B"  # Their clone with multi-turn chat template
+# ============ Defaults ============
+DEFAULT_MODEL = "PrimeIntellect/Qwen3-1.7B"
 DATASET_NAME = "willcb/V3-wordle"
-OUTPUT_DIR = "outputs/wordle_sft_full"
+BASE_OUTPUT_DIR = "outputs/wordle_sft"
 MAX_SEQ_LENGTH = 1024
-MAX_STEPS = 20  # Same as PrimeIntellect
+MAX_STEPS = 20
 LEARNING_RATE = 1e-5
 BATCH_SIZE = 1
-GRADIENT_ACCUMULATION = 64  # Total batch = 64
+GRADIENT_ACCUMULATION = 64
+
+
+def model_to_folder(model_name: str) -> str:
+    """Convert model name to a safe folder name (e.g. PrimeIntellect/Qwen3-1.7B -> PrimeIntellect-Qwen3-1.7B)."""
+    return model_name.replace("/", "-")
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="SFT Qwen3 on Wordle (model-agnostic)")
+    parser.add_argument("--model", default=DEFAULT_MODEL, help="HuggingFace model name")
+    parser.add_argument("--output-dir", default=BASE_OUTPUT_DIR, help="Base output directory")
+    parser.add_argument("--dataset", default=DATASET_NAME)
+    parser.add_argument("--max-steps", type=int, default=MAX_STEPS)
+    parser.add_argument("--seq-len", type=int, default=MAX_SEQ_LENGTH)
+    parser.add_argument("--lr", type=float, default=LEARNING_RATE)
+    parser.add_argument("--batch-size", type=int, default=BATCH_SIZE)
+    parser.add_argument("--grad-accum", type=int, default=GRADIENT_ACCUMULATION)
+    return parser.parse_args()
+
+
+args = parse_args()
+MODEL_NAME = args.model
+OUTPUT_DIR = f"{args.output_dir}/{model_to_folder(MODEL_NAME)}"
 
 # ============ Load Model & Tokenizer ============
-print(f"Loading model: {MODEL_NAME}")
+print(f"Model: {MODEL_NAME}")
+print(f"Output: {OUTPUT_DIR}")
 tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, trust_remote_code=True)
 if tokenizer.pad_token is None:
     tokenizer.pad_token = tokenizer.eos_token
@@ -36,8 +62,8 @@ model = AutoModelForCausalLM.from_pretrained(
 )
 
 # ============ Load & Format Dataset ============
-print(f"Loading dataset: {DATASET_NAME}")
-dataset = load_dataset(DATASET_NAME, split="train")
+print(f"Loading dataset: {args.dataset}")
+dataset = load_dataset(args.dataset, split="train")
 
 
 def format_conversation(example):
@@ -58,15 +84,15 @@ print(f"Example:\n{dataset[0]['text'][:500]}...")
 # ============ Training Config ============
 training_args = SFTConfig(
     output_dir=OUTPUT_DIR,
-    max_length=MAX_SEQ_LENGTH,
-    max_steps=MAX_STEPS,
-    per_device_train_batch_size=BATCH_SIZE,
-    gradient_accumulation_steps=GRADIENT_ACCUMULATION,
-    learning_rate=LEARNING_RATE,
+    max_length=args.seq_len,
+    max_steps=args.max_steps,
+    per_device_train_batch_size=args.batch_size,
+    gradient_accumulation_steps=args.grad_accum,
+    learning_rate=args.lr,
     lr_scheduler_type="cosine",
     warmup_steps=2,
     logging_steps=1,
-    save_steps=MAX_STEPS,
+    save_steps=args.max_steps,
     save_total_limit=2,
     bf16=True,  # A100 supports bf16
     gradient_checkpointing=True,
