@@ -91,9 +91,22 @@ Training curves will appear at [wandb.ai](https://wandb.ai) under the project yo
   ```
 - **Lightning**: Run `wandb login` once after SSH, or copy your `.env` to the Studio (it is not in git).
 
+## Play Wordle (evaluate SFT model)
+
+Run on the **Lightning.ai Studio** (where the GPU and trained weights are):
+
+```bash
+# SSH in, then:
+cd wordle-prime-rl-reproduction
+source /home/zeus/miniconda3/bin/activate
+python3 play_wordle.py --words plane store trace price crane
+```
+
+Or: `bash run_play_wordle_on_lightning.sh`
+
 ## Notes
 
-- This is **full-parameter** fine-tuning (no LoRA, no quantization).
+- **LoRA**: The script supports `--lora` for T4 15GB (avoids OOM). Without `--lora`, it does full-parameter fine-tuning (needs more VRAM).
 - **Loss is computed only on assistant tokens** (uses TRL's built-in `completion_only_loss` with prompt-completion format).
 - The dataset is exploded into one row per assistant turn so each example has a single completion to predict.
 - If you see OOM on T4, reduce `--seq-len` or increase gradient accumulation.

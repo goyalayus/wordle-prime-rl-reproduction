@@ -7,3 +7,4 @@ bitsandbytes
 peft
 wandb
 python-dotenv>=1.0.0
+deepspeed>=0.14.0

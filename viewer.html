@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wordle Model Comparison</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+            color: #e4e4e7;
+            padding: 2rem;
+        }
+
+        .container { max-width: 1600px; margin: 0 auto; }
+
+        header { text-align: center; margin-bottom: 2rem; }
+
+        h1 {
+            font-size: 2.5rem;
+            background: linear-gradient(90deg, #6ee7b7, #3b82f6, #8b5cf6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 2rem;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            padding-bottom: 1rem;
+        }
+
+        .tab {
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px 8px 0 0;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-bottom: none;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .tab:hover { background: rgba(255,255,255,0.1); }
+        .tab.active { background: rgba(110, 231, 183, 0.2); border-color: #6ee7b7; }
+
+        .model-loader {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .model-slot {
+            background: rgba(255,255,255,0.03);
+            border: 2px dashed rgba(255,255,255,0.2);
+            border-radius: 12px;
+            padding: 1.5rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .model-slot:hover { border-color: #6ee7b7; background: rgba(110,231,183,0.05); }
+        .model-slot.loaded { border-style: solid; border-color: #6ee7b7; }
+        .model-slot input { display: none; }
+        .model-slot .name { font-weight: 600; margin-bottom: 0.5rem; }
+        .model-slot .status { font-size: 0.85rem; color: #64748b; }
+        .model-slot.loaded .status { color: #6ee7b7; }
+
+        .comparison-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 2rem;
+            background: rgba(255,255,255,0.03);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .comparison-table th, .comparison-table td {
+            padding: 1rem;
+            text-align: left;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .comparison-table th { background: rgba(255,255,255,0.05); color: #94a3b8; font-size: 0.85rem; text-transform: uppercase; }
+        .comparison-table tr:hover { background: rgba(255,255,255,0.02); }
+
+        .badge { padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.8rem; font-weight: 600; }
+        .badge.success { background: rgba(110,231,183,0.2); color: #6ee7b7; }
+        .badge.warning { background: rgba(251,191,36,0.2); color: #fbbf24; }
+        .badge.error { background: rgba(248,113,113,0.2); color: #f87171; }
+
+        .test-comparison {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .model-result {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .model-result-header {
+            background: rgba(255,255,255,0.05);
+            padding: 1rem;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .model-result-header h4 { color: #6ee7b7; }
+
+        .model-result-content { padding: 1rem; }
+
+        .guess-display {
+            font-size: 2rem;
+            font-weight: 700;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            color: #6ee7b7;
+            text-align: center;
+            padding: 1rem;
+            background: rgba(110,231,183,0.1);
+            border-radius: 8px;
+            margin-bottom: 1rem;
+        }
+
+        .guess-display.error { color: #f87171; background: rgba(248,113,113,0.1); font-size: 1rem; letter-spacing: normal; }
+
+        .response-preview {
+            background: rgba(0,0,0,0.3);
+            border-radius: 8px;
+            padding: 1rem;
+            font-family: monospace;
+            font-size: 0.8rem;
+            line-height: 1.6;
+            max-height: 300px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .response-preview .think { color: #fbbf24; }
+        .response-preview .guess { color: #6ee7b7; }
+        .response-preview .bracket { background: rgba(110,231,183,0.2); color: #6ee7b7; padding: 0.1rem 0.3rem; border-radius: 4px; }
+
+        .test-selector {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+        }
+
+        .test-btn {
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            color: #e4e4e7;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .test-btn:hover { background: rgba(255,255,255,0.1); }
+        .test-btn.active { background: rgba(59,130,246,0.3); border-color: #3b82f6; }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+            font-size: 0.85rem;
+        }
+
+        .metric { text-align: center; padding: 0.5rem; background: rgba(0,0,0,0.2); border-radius: 6px; }
+        .metric-label { color: #64748b; font-size: 0.7rem; text-transform: uppercase; }
+        .metric-value { font-weight: 600; margin-top: 0.25rem; }
+
+        .section-title {
+            font-size: 1.25rem;
+            margin: 2rem 0 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .empty-state { text-align: center; padding: 4rem 2rem; color: #64748b; }
+        .empty-state h2 { color: #94a3b8; margin-bottom: 1rem; }
+
+        .auto-load-list { display: flex; gap: 0.5rem; flex-wrap: wrap; justify-content: center; margin-top: 1rem; }
+        .auto-load-btn {
+            padding: 0.5rem 1rem;
+            background: rgba(59,130,246,0.2);
+            border: 1px solid rgba(59,130,246,0.3);
+            border-radius: 6px;
+            color: #60a5fa;
+            cursor: pointer;
+            font-size: 0.85rem;
+        }
+        .auto-load-btn:hover { background: rgba(59,130,246,0.3); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Wordle Model Comparison</h1>
+            <p style="color: #64748b; margin-top: 0.5rem;">Compare SFT fine-tuned models side-by-side</p>
+        </header>
+
+        <div class="model-loader" id="modelLoader">
+            <label class="model-slot" data-slot="0">
+                <input type="file" accept=".json">
+                <div class="name">Model 1</div>
+                <div class="status">Click to load JSON</div>
+            </label>
+            <label class="model-slot" data-slot="1">
+                <input type="file" accept=".json">
+                <div class="name">Model 2</div>
+                <div class="status">Click to load JSON</div>
+            </label>
+            <label class="model-slot" data-slot="2">
+                <input type="file" accept=".json">
+                <div class="name">Model 3</div>
+                <div class="status">Click to load JSON</div>
+            </label>
+        </div>
+
+        <div class="auto-load-list">
+            <button class="auto-load-btn" onclick="autoLoad('wordle_test_results.json', 0)">Load wordle_test_results.json</button>
+            <button class="auto-load-btn" onclick="autoLoad('results_primeintellect_1p7b.json', 0)">Load PrimeIntellect 1.7B</button>
+            <button class="auto-load-btn" onclick="autoLoad('results_qwen_1p7b.json', 1)">Load Qwen 1.7B</button>
+            <button class="auto-load-btn" onclick="autoLoad('results_qwen_0p6b.json', 2)">Load Qwen 0.6B</button>
+        </div>
+
+        <div id="content">
+            <div class="empty-state">
+                <h2>No Models Loaded</h2>
+                <p>Load one or more JSON result files to compare models</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const models = [null, null, null];
+        const modelColors = ['#6ee7b7', '#3b82f6', '#8b5cf6'];
+        let selectedTest = 0;
+
+        document.querySelectorAll('.model-slot input').forEach((input, idx) => {
+            input.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (file) loadModel(file, idx);
+            });
+        });
+
+        function autoLoad(filename, slot) {
+            fetch(filename)
+                .then(r => r.json())
+                .then(data => {
+                    models[slot] = data;
+                    updateSlotUI(slot, data);
+                    renderComparison();
+                })
+                .catch(err => alert(`Could not load ${filename}: ${err.message}`));
+        }
+
+        function loadModel(file, slot) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    models[slot] = data;
+                    updateSlotUI(slot, data);
+                    renderComparison();
+                } catch (err) {
+                    alert('Invalid JSON file');
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function updateSlotUI(slot, data) {
+            const el = document.querySelector(`.model-slot[data-slot="${slot}"]`);
+            el.classList.add('loaded');
+            el.querySelector('.name').textContent = data.model.split('/').pop();
+            el.querySelector('.status').textContent = `${data.tests.length} tests loaded`;
+        }
+
+        function renderComparison() {
+            const loadedModels = models.filter(m => m !== null);
+            if (loadedModels.length === 0) {
+                document.getElementById('content').innerHTML = `
+                    <div class="empty-state">
+                        <h2>No Models Loaded</h2>
+                        <p>Load one or more JSON result files to compare models</p>
+                    </div>
+                `;
+                return;
+            }
+
+            const numTests = Math.max(...loadedModels.map(m => m.tests.length));
+
+            let html = '';
+
+            // Summary comparison table
+            html += '<h3 class="section-title">Summary Comparison</h3>';
+            html += '<table class="comparison-table"><thead><tr><th>Metric</th>';
+            models.forEach((m, i) => {
+                if (m) html += `<th style="color: ${modelColors[i]}">${m.model.split('/').pop()}</th>`;
+            });
+            html += '</tr></thead><tbody>';
+
+            // Metrics rows
+            const metrics = [
+                { label: 'Guesses Extracted', fn: m => m.tests.filter(t => t.extracted_guess).length + '/' + m.tests.length },
+                { label: '<think> Tags', fn: m => m.tests.filter(t => t.has_think_tag).length + '/' + m.tests.length },
+                { label: '<guess> Tags', fn: m => m.tests.filter(t => t.has_guess_tag).length + '/' + m.tests.length },
+                { label: 'Avg Response Length', fn: m => Math.round(m.tests.reduce((a, t) => a + t.response_length, 0) / m.tests.length).toLocaleString() },
+                { label: 'Max Tokens', fn: m => m.max_new_tokens?.toLocaleString() || 'N/A' },
+            ];
+
+            metrics.forEach(metric => {
+                html += `<tr><td>${metric.label}</td>`;
+                models.forEach(m => {
+                    if (m) html += `<td>${metric.fn(m)}</td>`;
+                });
+                html += '</tr>';
+            });
+            html += '</tbody></table>';
+
+            // Test selector
+            html += '<h3 class="section-title">Test Results</h3>';
+            html += '<div class="test-selector">';
+            for (let i = 0; i < numTests; i++) {
+                const testName = loadedModels[0].tests[i]?.name || `Test ${i + 1}`;
+                html += `<button class="test-btn ${i === selectedTest ? 'active' : ''}" onclick="selectTest(${i})">${testName}</button>`;
+            }
+            html += '</div>';
+
+            // Side-by-side comparison for selected test
+            html += '<div class="test-comparison">';
+            models.forEach((m, modelIdx) => {
+                if (!m) return;
+                const test = m.tests[selectedTest];
+                if (!test) return;
+
+                html += `
+                    <div class="model-result" style="border-color: ${modelColors[modelIdx]}40">
+                        <div class="model-result-header">
+                            <h4 style="color: ${modelColors[modelIdx]}">${m.model.split('/').pop()}</h4>
+                            <div>
+                                <span class="badge ${test.has_think_tag ? 'success' : 'error'}">&lt;think&gt;</span>
+                                <span class="badge ${test.has_guess_tag ? 'success' : 'error'}">&lt;guess&gt;</span>
+                            </div>
+                        </div>
+                        <div class="model-result-content">
+                            <div class="guess-display ${test.extracted_guess ? '' : 'error'}">
+                                ${test.extracted_guess || 'No guess found'}
+                            </div>
+                            <div class="metrics-grid">
+                                <div class="metric">
+                                    <div class="metric-label">Length</div>
+                                    <div class="metric-value">${test.response_length.toLocaleString()}</div>
+                                </div>
+                                <div class="metric">
+                                    <div class="metric-label">Think</div>
+                                    <div class="metric-value" style="color: ${test.has_think_tag ? '#6ee7b7' : '#f87171'}">${test.has_think_tag ? 'Yes' : 'No'}</div>
+                                </div>
+                                <div class="metric">
+                                    <div class="metric-label">Guess Tag</div>
+                                    <div class="metric-value" style="color: ${test.has_guess_tag ? '#6ee7b7' : '#f87171'}">${test.has_guess_tag ? 'Yes' : 'No'}</div>
+                                </div>
+                                <div class="metric">
+                                    <div class="metric-label">Turn</div>
+                                    <div class="metric-value">${test.turn}</div>
+                                </div>
+                            </div>
+                            <div class="response-preview">${highlightResponse(escapeHtml(test.response))}</div>
+                        </div>
+                    </div>
+                `;
+            });
+            html += '</div>';
+
+            document.getElementById('content').innerHTML = html;
+        }
+
+        function selectTest(idx) {
+            selectedTest = idx;
+            renderComparison();
+        }
+
+        function highlightResponse(text) {
+            return text
+                .replace(/(&lt;think&gt;)/gi, '<span class="think">$1</span>')
+                .replace(/(&lt;\/think&gt;)/gi, '<span class="think">$1</span>')
+                .replace(/(&lt;guess&gt;)/gi, '<span class="guess">$1</span>')
+                .replace(/(&lt;\/guess&gt;)/gi, '<span class="guess">$1</span>')
+                .replace(/\[([a-zA-Z]{5})\]/g, '<span class="bracket">[$1]</span>');
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Try to auto-load default file
+        fetch('wordle_test_results.json')
+            .then(r => r.json())
+            .then(data => {
+                models[0] = data;
+                updateSlotUI(0, data);
+                renderComparison();
+            })
+            .catch(() => {});
+    </script>
+</body>
+</html>
