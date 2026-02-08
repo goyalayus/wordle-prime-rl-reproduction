@@ -1,0 +1,8 @@
+torch>=2.1.0
+transformers>=4.56.2
+trl>=0.22.2
+datasets>=2.18.0
+accelerate
+huggingface_hub
+python-dotenv>=1.0.0
+wandb
