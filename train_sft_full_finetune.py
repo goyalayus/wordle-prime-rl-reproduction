@@ -30,7 +30,7 @@ MODEL_ID = "Qwen/Qwen3-0.6B"
 MAX_SEQ_LENGTH = 1024
 MAX_STEPS = 400
 GLOBAL_BATCH_SIZE = 64
-PER_DEVICE_BATCH_SIZE = 4  # Full fine-tune; T4 15GB
+PER_DEVICE_BATCH_SIZE = 2  # Full fine-tune; T4 15GB (float32 model needs smaller batch)
 LEARNING_RATE = 1e-5
 PUSH_EVERY_STEPS = 40
 
