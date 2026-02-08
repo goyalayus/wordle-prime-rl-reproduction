@@ -326,7 +326,8 @@ training_kwargs = dict(
 if eval_dataset is not None:
     training_kwargs.update(
         dict(
-            evaluation_strategy="steps",
+            do_eval=True,
+            eval_strategy="steps",
             eval_steps=args.eval_every_steps,
         )
     )
