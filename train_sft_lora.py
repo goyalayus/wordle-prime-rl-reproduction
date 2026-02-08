@@ -1,6 +1,9 @@
 """
 LoRA SFT on Qwen 0.6B for Wordle. Pushes adapter to Hugging Face every 40 steps.
 
+Uses Unsloth for 2x faster training, 70% less VRAM. LoRA applied to MLP layers only
+(gate_proj, up_proj, down_proj).
+
 Experiment: 400 steps, global batch 64, checkpoint every 40 steps to HF.
 Target: Lightning AI single T4 GPU.
 
@@ -17,13 +20,12 @@ import argparse
 import os
 from typing import Any
 
-import torch
 from datasets import load_dataset
 from huggingface_hub import HfApi
-from peft import LoraConfig, get_peft_model
-from transformers import AutoModelForCausalLM, AutoTokenizer
 from transformers.trainer_callback import TrainerCallback
 from trl import SFTConfig, SFTTrainer
+
+from unsloth import FastLanguageModel, FastModel
 
 DATASET_NAME = "willcb/V3-wordle"
 MODEL_ID = "Qwen/Qwen3-0.6B"
@@ -99,26 +101,29 @@ def main():
     api = HfApi()
     api.create_repo(repo_id=args.hf_repo_id, exist_ok=True)
 
-    tokenizer = AutoTokenizer.from_pretrained(args.model, trust_remote_code=True)
+    model, tokenizer = FastModel.from_pretrained(
+        model_name=args.model,
+        max_seq_length=args.seq_len,
+        load_in_4bit=True,
+        load_in_8bit=False,
+        load_in_16bit=False,
+        full_finetuning=False,
+        trust_remote_code=True,
+    )
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
-    model = AutoModelForCausalLM.from_pretrained(
-        args.model,
-        torch_dtype=torch.bfloat16,
-        trust_remote_code=True,
-        attn_implementation="sdpa",
-    )
-
-    lora_config = LoraConfig(
+    model = FastLanguageModel.get_peft_model(
+        model,
         r=16,
+        target_modules=["gate_proj", "up_proj", "down_proj"],
         lora_alpha=32,
-        target_modules=["q_proj", "k_proj", "v_proj", "o_proj"],
-        lora_dropout=0.05,
+        lora_dropout=0,
         bias="none",
-        task_type="CAUSAL_LM",
+        use_gradient_checkpointing="unsloth",
+        random_state=3407,
+        max_seq_length=args.seq_len,
     )
-    model = get_peft_model(model, lora_config)
     model.print_trainable_parameters()
 
     dataset = load_dataset(args.dataset, split="train")
@@ -139,7 +144,7 @@ def main():
 
     training_args = SFTConfig(
         output_dir="outputs/lora_sft",
-        max_length=args.seq_len,
+        max_seq_length=args.seq_len,
         max_steps=args.max_steps,
         per_device_train_batch_size=args.per_device_batch_size,
         gradient_accumulation_steps=grad_accum,
@@ -150,7 +155,7 @@ def main():
         save_steps=args.push_every_steps,
         save_total_limit=1,
         bf16=True,
-        gradient_checkpointing=True,
+        optim="adamw_8bit",
         report_to="none",
         dataset_text_field="text",
         seed=args.seed,
