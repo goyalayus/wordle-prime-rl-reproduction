@@ -82,8 +82,10 @@ def _format_turn_history(turns: Sequence[Dict[str, Any]]) -> str:
         return "Turn 0: (no guesses yet)\n"
     lines: List[str] = []
     for t in turns:
-        lines.append(f"Turn {t['turn']}: You guessed [{t['guess']}]")
-        lines.append("Feedback: " + " ".join(t["feedback"]))
+        guess = t.get("guess") or "(no guess)"
+        lines.append(f"Turn {t['turn']}: You guessed [{guess}]")
+        feedback = t.get("feedback")
+        lines.append("Feedback: " + (" ".join(feedback) if feedback else "N/A"))
         lines.append("")
     return "\n".join(lines).rstrip() + "\n"
 

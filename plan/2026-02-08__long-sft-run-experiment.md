@@ -198,3 +198,5 @@ At the end of each eval:
     - auto-load `.env` if present
     - supports `--local-path` + `--repo-id` to upload arbitrary outputs (e.g. `outputs/wordle_sft_long/.../final`)
     - retains backwards-compatible default upload list.
+- 2026-02-08 18:17
+  - Fixed gameplay logging crash: `_format_turn_history` now tolerates missing `feedback` (invalid guesses) so the callback doesn’t throw during early evals.
