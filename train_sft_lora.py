@@ -49,6 +49,11 @@ def parse_args():
     p.add_argument("--seq-len", type=int, default=MAX_SEQ_LENGTH)
     p.add_argument("--lr", type=float, default=LEARNING_RATE)
     p.add_argument("--seed", type=int, default=123)
+    p.add_argument("--val-size", type=int, default=100, help="Validation set size for eval loss")
+    p.add_argument("--eval-every-steps", type=int, default=40, help="Run eval every N steps")
+    p.add_argument("--wandb", action="store_true", help="Log train/eval loss to Weights & Biases")
+    p.add_argument("--wandb-project", default=os.environ.get("WANDB_PROJECT", "wordle-lora-sft"))
+    p.add_argument("--wandb-name", default=None)
     return p.parse_args()
 
 
@@ -97,6 +102,9 @@ def main():
     if not os.environ.get("HF_TOKEN") and not os.environ.get("HUGGING_FACE_HUB_TOKEN"):
         raise ValueError("Set HF_TOKEN or HUGGING_FACE_HUB_TOKEN for push to Hub")
 
+    if args.wandb:
+        os.environ["WANDB_PROJECT"] = args.wandb_project
+
     # Ensure repo exists
     api = HfApi()
     api.create_repo(repo_id=args.hf_repo_id, exist_ok=True)
@@ -136,13 +144,24 @@ def main():
     dataset = dataset.map(format_conversation, remove_columns=dataset.column_names)
     print(f"Dataset size: {len(dataset)}")
 
+    # Train/val split for eval loss
+    val_size = min(max(0, args.val_size), len(dataset) - 1)
+    if val_size > 0:
+        split = dataset.train_test_split(test_size=val_size, seed=args.seed, shuffle=True)
+        train_dataset = split["train"]
+        eval_dataset = split["test"]
+        print(f"Train: {len(train_dataset)} | Val: {len(eval_dataset)}")
+    else:
+        train_dataset = dataset
+        eval_dataset = None
+
     grad_accum = args.global_batch_size // args.per_device_batch_size
     if args.global_batch_size % args.per_device_batch_size != 0:
         raise ValueError(
             f"global_batch_size ({args.global_batch_size}) must be divisible by per_device_batch_size ({args.per_device_batch_size})"
         )
 
-    training_args = SFTConfig(
+    training_kwargs = dict(
         output_dir="outputs/lora_sft",
         max_seq_length=args.seq_len,
         max_steps=args.max_steps,
@@ -156,15 +175,22 @@ def main():
         save_total_limit=1,
         bf16=True,
         optim="adamw_8bit",
-        report_to="none",
+        report_to="wandb" if args.wandb else "none",
+        run_name=args.wandb_name,
         dataset_text_field="text",
         seed=args.seed,
     )
+    if eval_dataset is not None:
+        training_kwargs["eval_strategy"] = "steps"
+        training_kwargs["eval_steps"] = args.eval_every_steps
+
+    training_args = SFTConfig(**training_kwargs)
 
     trainer = SFTTrainer(
         model=model,
         args=training_args,
-        train_dataset=dataset,
+        train_dataset=train_dataset,
+        eval_dataset=eval_dataset,
         processing_class=tokenizer,
         callbacks=[PushToHubCallback(repo_id=args.hf_repo_id, push_every=args.push_every_steps)],
     )

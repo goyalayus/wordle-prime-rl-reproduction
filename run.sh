@@ -30,4 +30,4 @@ fi
 pip install -q -r requirements.txt
 export TOKENIZERS_PARALLELISM=false
 
-python train_sft_lora.py
+python train_sft_lora.py --wandb
