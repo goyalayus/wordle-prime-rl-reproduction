@@ -20,12 +20,11 @@ import argparse
 import os
 from typing import Any
 
+from unsloth import FastLanguageModel, FastModel
 from datasets import load_dataset
 from huggingface_hub import HfApi
 from transformers.trainer_callback import TrainerCallback
 from trl import SFTConfig, SFTTrainer
-
-from unsloth import FastLanguageModel, FastModel
 
 DATASET_NAME = "willcb/V3-wordle"
 MODEL_ID = "Qwen/Qwen3-0.6B"
@@ -163,7 +162,7 @@ def main():
 
     training_kwargs = dict(
         output_dir="outputs/lora_sft",
-        max_seq_length=args.seq_len,
+        max_length=args.seq_len,
         max_steps=args.max_steps,
         per_device_train_batch_size=args.per_device_batch_size,
         gradient_accumulation_steps=grad_accum,
