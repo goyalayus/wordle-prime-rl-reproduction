@@ -172,7 +172,7 @@ def main():
         logging_steps=1,
         save_steps=args.push_every_steps,
         save_total_limit=1,
-        bf16=True,
+        fp16=True,
         optim="adamw_8bit",
         report_to="wandb" if args.wandb else "none",
         run_name=args.wandb_name,
