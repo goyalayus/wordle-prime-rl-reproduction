@@ -11,6 +11,13 @@
 
 set -euo pipefail
 
+# Load .env if present (for HF_TOKEN, WANDB_API_KEY, HF_REPO_ID)
+if [ -f .env ]; then
+  set -a
+  source .env
+  set +a
+fi
+
 if [ -f "$HOME/miniconda3/bin/activate" ]; then
   source "$HOME/miniconda3/bin/activate"
 elif [ -f "/home/zeus/miniconda3/bin/activate" ]; then
