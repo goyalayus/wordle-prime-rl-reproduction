@@ -200,3 +200,6 @@ At the end of each eval:
     - retains backwards-compatible default upload list.
 - 2026-02-08 18:17
   - Fixed gameplay logging crash: `_format_turn_history` now tolerates missing `feedback` (invalid guesses) so the callback doesn’t throw during early evals.
+
+- 2026-02-08 18:25
+  - Adjusted `run_long_sft_a100.sh` to skip the heavy `flash-attn` build unless `INSTALL_FLASH_ATTENTION=1`, reducing compile time on Lightning. Training now restarts cleanly after pulling latest branch.

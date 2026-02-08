@@ -29,8 +29,12 @@ PYTHON_BIN="${PYTHON_BIN:-python}"
 
 "$PYTHON_BIN" -m pip install -q -r requirements.txt
 
-# Optional performance dependency; ignore failures to keep the run unblocked.
-"$PYTHON_BIN" -m pip install -q flash-attn --no-build-isolation || true
+# Optional performance dependency; install only when INSTALL_FLASH_ATTENTION is non-empty.
+if [ -n "${INSTALL_FLASH_ATTENTION:-}" ]; then
+  "$PYTHON_BIN" -m pip install -q flash-attn --no-build-isolation || true
+else
+  echo "Skipping flash-attn install (set INSTALL_FLASH_ATTENTION=1 to enable)" >&2
+fi
 
 export TOKENIZERS_PARALLELISM=false
 export WANDB_PROJECT="${WANDB_PROJECT:-wordle-sft}"
