@@ -109,7 +109,7 @@ def main():
 
     model = AutoModelForCausalLM.from_pretrained(
         args.model,
-        torch_dtype=torch.float16,
+        torch_dtype=torch.float32,
         trust_remote_code=True,
         attn_implementation="sdpa",
     )
