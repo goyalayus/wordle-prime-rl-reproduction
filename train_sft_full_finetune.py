@@ -30,7 +30,7 @@ MODEL_ID = "Qwen/Qwen3-0.6B"
 MAX_SEQ_LENGTH = 1024
 MAX_STEPS = 400
 GLOBAL_BATCH_SIZE = 64
-PER_DEVICE_BATCH_SIZE = 4  # Full fine-tune; T4 15GB (float16 model, no mixed precision)
+PER_DEVICE_BATCH_SIZE = 1  # T4 15GB: float32 model + fp16 mixed precision (GradScaler) for stability
 LEARNING_RATE = 1e-5
 PUSH_EVERY_STEPS = 40
 
@@ -170,7 +170,7 @@ def main():
 
     model = AutoModelForCausalLM.from_pretrained(
         args.model,
-        torch_dtype=torch.float16,
+        torch_dtype=torch.float32,
         trust_remote_code=True,
         attn_implementation="sdpa",
     )
@@ -221,8 +221,8 @@ def main():
         logging_steps=1,
         save_steps=args.push_every_steps,
         save_total_limit=1,
-        fp16=False,  # Model in float16 natively; no mixed precision needed
-        max_grad_norm=1.0,  # Clip gradients to prevent float16 overflow
+        fp16=True,  # Mixed precision with GradScaler; prevents gradient overflow during backward
+        max_grad_norm=1.0,
         gradient_checkpointing=True,
         report_to="wandb" if args.wandb else "none",
         run_name=args.wandb_name,
