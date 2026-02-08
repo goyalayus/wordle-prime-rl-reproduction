@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Wordle Long-Run Evals</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      background: linear-gradient(135deg, #0b1020 0%, #0b1b33 45%, #0b1020 100%);
+      color: #e5e7eb;
+    }
+    header {
+      padding: 20px 24px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      background: rgba(255,255,255,0.03);
+    }
+    h1 { margin: 0; font-size: 20px; letter-spacing: 0.2px; }
+    .sub { margin-top: 6px; color: #9ca3af; font-size: 13px; }
+
+    .wrap { max-width: 1400px; margin: 0 auto; padding: 18px 24px 40px; }
+    .row { display: grid; grid-template-columns: 420px 1fr; gap: 18px; }
+    @media (max-width: 1100px) { .row { grid-template-columns: 1fr; } }
+
+    .card {
+      border: 1px solid rgba(255,255,255,0.10);
+      border-radius: 12px;
+      background: rgba(255,255,255,0.03);
+      overflow: hidden;
+    }
+    .card h2 {
+      margin: 0;
+      padding: 14px 16px;
+      font-size: 14px;
+      color: #93c5fd;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      background: rgba(255,255,255,0.04);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+    .card .body { padding: 14px 16px; }
+
+    input[type="text"] {
+      width: 100%;
+      padding: 10px 12px;
+      background: rgba(0,0,0,0.35);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 10px;
+      color: #e5e7eb;
+      outline: none;
+    }
+    input[type="text"]::placeholder { color: #6b7280; }
+    button {
+      margin-top: 10px;
+      padding: 10px 12px;
+      width: 100%;
+      background: rgba(59,130,246,0.25);
+      border: 1px solid rgba(59,130,246,0.35);
+      color: #bfdbfe;
+      border-radius: 10px;
+      cursor: pointer;
+    }
+    button:hover { background: rgba(59,130,246,0.33); }
+
+    .muted { color: #9ca3af; font-size: 13px; line-height: 1.5; }
+    .err { color: #fca5a5; font-size: 13px; margin-top: 10px; white-space: pre-wrap; }
+
+    .step-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+    .pill {
+      padding: 7px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.12);
+      background: rgba(0,0,0,0.25);
+      font-size: 12px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .pill.active { border-color: rgba(110,231,183,0.5); background: rgba(110,231,183,0.12); color: #d1fae5; }
+
+    .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+    @media (max-width: 1100px) { .grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 600px) { .grid { grid-template-columns: 1fr; } }
+    .metric {
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 10px;
+      padding: 10px 12px;
+      background: rgba(0,0,0,0.25);
+    }
+    .metric .k { color: #9ca3af; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; }
+    .metric .v { margin-top: 6px; font-size: 16px; font-weight: 650; color: #e5e7eb; }
+
+    .games { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-top: 14px; }
+    @media (max-width: 1100px) { .games { grid-template-columns: 1fr; } }
+    .game {
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 12px;
+      overflow: hidden;
+      background: rgba(0,0,0,0.20);
+    }
+    .game .top {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 10px 12px;
+      background: rgba(255,255,255,0.04);
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+    .badge {
+      font-size: 12px;
+      padding: 4px 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.10);
+      background: rgba(0,0,0,0.25);
+      color: #d1d5db;
+    }
+    .badge.ok { border-color: rgba(110,231,183,0.45); background: rgba(110,231,183,0.12); color: #d1fae5; }
+    .badge.no { border-color: rgba(248,113,113,0.45); background: rgba(248,113,113,0.12); color: #fee2e2; }
+
+    .turns { padding: 10px 12px; }
+    .turn {
+      padding: 10px 10px;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 10px;
+      background: rgba(0,0,0,0.18);
+      margin-bottom: 10px;
+    }
+    .turn:last-child { margin-bottom: 0; }
+    .turn .hdr { display: flex; justify-content: space-between; align-items: center; }
+    .turn .guess {
+      font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase;
+      color: #6ee7b7;
+    }
+    .turn .guess.invalid { color: #fca5a5; letter-spacing: 0.02em; text-transform: none; }
+    .fb { margin-top: 8px; display: flex; gap: 6px; }
+    .cell {
+      width: 34px; height: 34px; border-radius: 8px;
+      display: grid; place-items: center;
+      font-weight: 800; color: #0b1020;
+      border: 1px solid rgba(0,0,0,0.2);
+    }
+    .G { background: #22c55e; }
+    .Y { background: #f59e0b; }
+    .B { background: #374151; color: #e5e7eb; }
+
+    details { margin-top: 10px; }
+    summary { cursor: pointer; color: #93c5fd; }
+    pre {
+      margin: 10px 0 0;
+      padding: 10px 12px;
+      border-radius: 10px;
+      background: rgba(0,0,0,0.35);
+      border: 1px solid rgba(255,255,255,0.08);
+      overflow-x: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-size: 12px;
+      line-height: 1.5;
+      color: #e5e7eb;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Wordle Long-Run Evals</h1>
+    <div class="sub">Loads `manifest.json` + per-step `summary.json` / `gameplay.json` produced during training.</div>
+  </header>
+
+  <div class="wrap">
+    <div class="row">
+      <div class="card">
+        <h2>Load</h2>
+        <div class="body">
+          <div class="muted">
+            Enter the eval root directory (relative URL) and click Load.
+            Example: <code>outputs/wordle_sft/Qwen-Qwen3-0.6B/evals</code>
+          </div>
+          <input id="root" type="text" placeholder="outputs/.../evals" />
+          <button id="loadBtn">Load manifest</button>
+          <div id="err" class="err" style="display:none;"></div>
+          <div id="steps" class="step-list"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Step</h2>
+        <div class="body">
+          <div id="meta" class="muted">No step loaded.</div>
+          <div id="metrics" class="grid" style="margin-top:12px;"></div>
+          <div id="games" class="games"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const state = { root: "", steps: [], active: null, cache: new Map() };
+
+    function showErr(msg) {
+      const el = $("err");
+      el.style.display = "block";
+      el.textContent = msg;
+    }
+    function clearErr() {
+      const el = $("err");
+      el.style.display = "none";
+      el.textContent = "";
+    }
+
+    function join(root, path) {
+      root = root.replace(/\/+$/, "");
+      path = path.replace(/^\/+/, "");
+      return `${root}/${path}`;
+    }
+
+    async function fetchJson(url) {
+      const res = await fetch(url, { cache: "no-store" });
+      if (!res.ok) throw new Error(`${res.status} ${res.statusText}: ${url}`);
+      return await res.json();
+    }
+
+    function renderSteps() {
+      const box = $("steps");
+      box.innerHTML = "";
+      state.steps.forEach((s) => {
+        const pill = document.createElement("div");
+        pill.className = "pill" + (state.active === s ? " active" : "");
+        pill.textContent = s;
+        pill.onclick = () => loadStep(s);
+        box.appendChild(pill);
+      });
+    }
+
+    function metric(k, v) {
+      const d = document.createElement("div");
+      d.className = "metric";
+      const kk = document.createElement("div");
+      kk.className = "k";
+      kk.textContent = k;
+      const vv = document.createElement("div");
+      vv.className = "v";
+      vv.textContent = v;
+      d.appendChild(kk); d.appendChild(vv);
+      return d;
+    }
+
+    function renderStep(results) {
+      const meta = $("meta");
+      meta.textContent = `step=${results.global_step ?? "?"} model=${results.model ?? "?"} at ${results.timestamp ?? "?"}`;
+
+      const summary = results.summary || {};
+      const metrics = $("metrics");
+      metrics.innerHTML = "";
+      metrics.appendChild(metric("Solved rate", (summary.solved_rate ?? 0).toFixed(2)));
+      metrics.appendChild(metric("Solved", `${summary.solved_count ?? 0}/${(results.meta?.n_games ?? 0)}`));
+      metrics.appendChild(metric("Avg turns", (summary.avg_turns ?? 0).toFixed(2)));
+      metrics.appendChild(metric("Invalid guesses", `${summary.invalid_guess_total ?? 0}`));
+
+      const gamesEl = $("games");
+      gamesEl.innerHTML = "";
+
+      (results.games || []).forEach((g) => {
+        const game = document.createElement("div");
+        game.className = "game";
+
+        const top = document.createElement("div");
+        top.className = "top";
+        const left = document.createElement("div");
+        left.innerHTML = `<span style="font-weight:800; letter-spacing:0.14em; text-transform:uppercase;">${g.secret_word}</span>`;
+        const badge = document.createElement("span");
+        badge.className = "badge " + (g.solved ? "ok" : "no");
+        badge.textContent = g.solved ? `Solved in ${g.turns_taken}` : `Unsolved (${g.turns_taken})`;
+        top.appendChild(left);
+        top.appendChild(badge);
+
+        const turns = document.createElement("div");
+        turns.className = "turns";
+        (g.turns || []).forEach((t) => {
+          const turn = document.createElement("div");
+          turn.className = "turn";
+
+          const hdr = document.createElement("div");
+          hdr.className = "hdr";
+          const guess = document.createElement("div");
+          const guessVal = t.guess ?? "(no guess extracted)";
+          guess.className = "guess" + (t.error ? " invalid" : "");
+          guess.textContent = t.error ? `${guessVal} (${t.error})` : guessVal;
+          const turnNo = document.createElement("div");
+          turnNo.className = "muted";
+          turnNo.textContent = `turn ${t.turn}`;
+          hdr.appendChild(guess);
+          hdr.appendChild(turnNo);
+
+          turn.appendChild(hdr);
+
+          if (t.feedback) {
+            const fb = document.createElement("div");
+            fb.className = "fb";
+            t.feedback.forEach((c) => {
+              const cell = document.createElement("div");
+              cell.className = `cell ${c}`;
+              cell.textContent = c;
+              fb.appendChild(cell);
+            });
+            turn.appendChild(fb);
+          }
+
+          const det = document.createElement("details");
+          const sum = document.createElement("summary");
+          sum.textContent = "raw model output";
+          const pre = document.createElement("pre");
+          pre.textContent = t.raw_response ?? "";
+          det.appendChild(sum);
+          det.appendChild(pre);
+          turn.appendChild(det);
+
+          turns.appendChild(turn);
+        });
+
+        game.appendChild(top);
+        game.appendChild(turns);
+        gamesEl.appendChild(game);
+      });
+    }
+
+    async function loadManifest() {
+      clearErr();
+      const root = $("root").value.trim();
+      if (!root) return showErr("Enter an eval root (e.g. outputs/.../evals).");
+
+      state.root = root;
+      const url = join(root, "manifest.json");
+      try {
+        const manifest = await fetchJson(url);
+        state.steps = (manifest.steps || []).slice().sort();
+        state.active = null;
+        renderSteps();
+        $("meta").textContent = `Loaded manifest with ${state.steps.length} steps. Click a step to view.`;
+        $("metrics").innerHTML = "";
+        $("games").innerHTML = "";
+      } catch (e) {
+        showErr(String(e));
+      }
+    }
+
+    async function loadStep(stepDir) {
+      clearErr();
+      state.active = stepDir;
+      renderSteps();
+
+      const key = `${state.root}::${stepDir}`;
+      if (state.cache.has(key)) {
+        renderStep(state.cache.get(key));
+        return;
+      }
+
+      const gameplayUrl = join(join(state.root, stepDir), "gameplay.json");
+      try {
+        const results = await fetchJson(gameplayUrl);
+        state.cache.set(key, results);
+        renderStep(results);
+      } catch (e) {
+        showErr(String(e));
+      }
+    }
+
+    $("loadBtn").onclick = loadManifest;
+    const params = new URLSearchParams(window.location.search);
+    const rootParam = params.get("root");
+    if (rootParam) {
+      $("root").value = rootParam;
+      loadManifest();
+    }
+  </script>
+</body>
+</html>
+

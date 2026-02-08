@@ -83,6 +83,46 @@ python train_sft_trl_qwen3_1p7b.py \
 
 Training curves will appear at [wandb.ai](https://wandb.ai) under the project you specify.
 
+## Long SFT run (Qwen/Qwen3-0.6B) + periodic gameplay evals
+
+This repo supports a “long SFT” experiment where we:
+- Train `Qwen/Qwen3-0.6B` for many more optimizer steps than the baseline (default baseline artifacts in this repo were trained for 20 steps).
+- Every **20 optimizer steps**, run a lightweight **gameplay evaluation** consisting of **5 fixed secret words** (6 turns max each).
+- Log **train loss** and **validation loss** to **W&B**.
+- Write per-step gameplay JSON under the training output directory and provide an HTML viewer.
+
+### Run on an A100 (recommended)
+
+Use the convenience script:
+
+```bash
+bash run_long_sft_a100.sh
+```
+
+Key knobs (env vars) you can tune before running:
+- `MAX_STEPS` (default `1000`) — total optimizer steps.
+- `GLOBAL_BS` (default `60`) — effective examples per optimizer step.
+- `PER_DEVICE_BS` (default `4`) — increase to better utilize an A100, keeping `GLOBAL_BS % PER_DEVICE_BS == 0`.
+- `EVAL_EVERY` (default `20`) — gameplay + validation loss frequency (no eval at step 0).
+- `SECRET_WORDS` (default `crane,alert,amaze,plane,store`) — the 5 secret words used for all periodic evals.
+
+### View eval artifacts (HTML)
+
+Gameplay eval artifacts are written to:
+- `outputs/wordle_sft_long/<MODEL_NAME_SANITIZED>/evals/`
+  - `manifest.json` lists available `step_XXXXXX/` directories
+  - each `step_XXXXXX/` contains `gameplay.json` and `summary.json`
+
+To view:
+1) Serve the repo root via HTTP:
+   ```bash
+   python3 -m http.server 8000
+   ```
+2) Open:
+   - `viewer_long_run.html`
+   - pass `root` as a query param, e.g.:
+     `http://localhost:8000/viewer_long_run.html?root=outputs/wordle_sft_long/Qwen-Qwen3-0.6B/evals`
+
 ## W&B API key
 
 - **Local**: The script loads `WANDB_API_KEY` from `.env` (gitignored). Create `.env` with:
@@ -90,6 +130,16 @@ Training curves will appear at [wandb.ai](https://wandb.ai) under the project yo
   WANDB_API_KEY=your_key_from_wandb.ai/authorize
   ```
 - **Lightning**: Run `wandb login` once after SSH, or copy your `.env` to the Studio (it is not in git).
+
+## Hugging Face token (recommended)
+
+For higher HF Hub rate limits (and to access private models), set a token in `.env`:
+
+```
+HF_TOKEN=your_token_from_huggingface.co/settings/tokens
+```
+
+This is optional for public models/datasets but makes long runs more reliable.
 
 ## Play Wordle (evaluate SFT model)
 
