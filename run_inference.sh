@@ -16,4 +16,4 @@ if [ -f .env ]; then
   set +a
 fi
 
-python run_inference.py
+python run_inference.py && bash push_inference_results.sh
